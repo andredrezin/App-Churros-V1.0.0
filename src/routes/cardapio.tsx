@@ -170,19 +170,19 @@ export default function CardapioPublico() {
 
         {loading ? (
           <div className="grid sm:grid-cols-2 gap-5">
-            {Array.from({ length: 4 }).map((_, i) => (
+            {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="rounded-2xl border-2 border-border bg-card overflow-hidden animate-pulse">
                 <div className="aspect-4/3 bg-secondary/60" />
-                <div className="p-4 space-y-2">
-                  <div className="h-5 bg-secondary/60 rounded w-3/4" />
+                <div className="p-3 space-y-2">
+                  <div className="h-4 bg-secondary/60 rounded w-3/4" />
                   <div className="h-3 bg-secondary/40 rounded w-full" />
-                  <div className="h-7 bg-secondary/40 rounded w-1/3 mt-3" />
+                  <div className="h-6 bg-secondary/40 rounded w-1/3 mt-2" />
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {filteredProdutos.map((p, idx) => {
               const prodFotos = fotos.filter((f) => f.produto_id === p.id).sort((a, b) => a.ordem - b.ordem);
               const qty = cart.find((e) => e.produto.id === p.id)?.quantidade ?? 0;
@@ -311,60 +311,68 @@ function ProdutoCard({ produto: p, fotos, qty, idx: cardIdx, onAdd, onRemove }: 
   const delay = STAGGER_DELAYS[cardIdx % STAGGER_DELAYS.length];
 
   return (
-    <div className={`rounded-2xl border-2 bg-card overflow-hidden transition animate-fade-up ${delay} ${p.esgotado ? "opacity-50 border-border" : "border-border hover:border-primary/40 hover:shadow-warm"}`}>
-      {/* Foto / carrossel — aspect-ratio 4:3 fixo, object-top para não cortar o produto */}
-      {fotos.length > 0 ? (
-        <div className="relative w-full aspect-4/3 bg-black select-none overflow-hidden">
-          {fotos[slideIdx].tipo === "video" ? (
-            <video src={fotos[slideIdx].url} className="w-full h-full object-cover object-top" controls playsInline preload="metadata" />
-          ) : (
-            <img src={fotos[slideIdx].url} alt={`${p.nome} ${slideIdx + 1}`} className="w-full h-full object-cover object-top" />
-          )}
-          {fotos.length > 1 && (
-            <>
-              <button onClick={prev} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition"><ChevronLeft className="h-4 w-4" /></button>
-              <button onClick={next} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition"><ChevronRight className="h-4 w-4" /></button>
-              <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
-                {fotos.map((_, i) => (
-                  <button key={i} onClick={() => setSlideIdx(i)} className={`h-1.5 rounded-full transition-all ${i === slideIdx ? "w-5 bg-white" : "w-1.5 bg-white/50"}`} />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      ) : (
-        <div className="w-full aspect-4/3 bg-linear-to-br from-primary/20 to-gold/10 flex items-center justify-center">
-          <Flame className="h-12 w-12 text-primary/30" />
-        </div>
-      )}
+    <div className={`rounded-2xl border-2 bg-card overflow-hidden transition animate-fade-up ${delay} ${p.esgotado ? "border-border" : "border-border hover:border-primary/50 hover:shadow-warm"}`}>
+      {/* Área de mídia — sempre aspect-4/3 para consistência entre todos os cards */}
+      <div className="relative w-full aspect-4/3 overflow-hidden select-none">
+        {fotos.length > 0 ? (
+          <>
+            {fotos[slideIdx].tipo === "video" ? (
+              <video src={fotos[slideIdx].url} className="w-full h-full object-cover object-top" controls playsInline preload="metadata" />
+            ) : (
+              <img src={fotos[slideIdx].url} alt={`${p.nome} ${slideIdx + 1}`} className="w-full h-full object-cover object-top" />
+            )}
+            {fotos.length > 1 && (
+              <>
+                <button onClick={prev} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition"><ChevronLeft className="h-4 w-4" /></button>
+                <button onClick={next} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition"><ChevronRight className="h-4 w-4" /></button>
+                <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
+                  {fotos.map((_, i) => (
+                    <button key={i} onClick={() => setSlideIdx(i)} className={`h-1.5 rounded-full transition-all ${i === slideIdx ? "w-5 bg-white" : "w-1.5 bg-white/50"}`} />
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        ) : (
+          /* Placeholder com nome do produto visível — mesmo tamanho que os com foto */
+          <div className="w-full h-full bg-brand-gradient flex flex-col items-center justify-center gap-2 px-4">
+            <div className="h-12 w-12 rounded-xl bg-white/15 flex items-center justify-center">
+              <Flame className="h-6 w-6 text-gold" />
+            </div>
+            <p className="font-display font-bold text-white text-center text-base leading-tight line-clamp-2">{p.nome}</p>
+          </div>
+        )}
+        {/* Overlay esgotado */}
+        {p.esgotado && (
+          <div className="absolute inset-0 bg-black/65 flex items-center justify-center">
+            <span className="font-black text-white text-base bg-destructive px-4 py-1.5 rounded-full">Esgotado</span>
+          </div>
+        )}
+      </div>
 
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-2 mb-1">
-          <h3 className="font-display text-lg font-bold leading-tight">{p.nome}</h3>
-          {p.esgotado && <span className="shrink-0 text-xs font-bold bg-destructive/20 text-destructive px-2 py-0.5 rounded-full">Esgotado</span>}
-        </div>
-        {p.descricao && <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{p.descricao}</p>}
+      {/* Conteúdo do card */}
+      <div className="p-3">
+        <h3 className="font-display text-base font-bold leading-tight line-clamp-1">{p.nome}</h3>
+        {p.descricao && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{p.descricao}</p>}
 
         <div className="flex items-center justify-between mt-3">
-          <span className="text-gold font-bold text-2xl">{brl(p.preco_base)}</span>
+          <span className="text-gold font-bold text-xl">{brl(p.preco_base)}</span>
 
-          {p.esgotado ? (
-            <span className="text-sm text-muted-foreground">Indisponível</span>
-          ) : qty === 0 ? (
+          {p.esgotado ? null : qty === 0 ? (
             <button
               onClick={onAdd}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition active:scale-95"
+              className="flex items-center gap-1 px-3 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition active:scale-95"
             >
               <Plus className="h-4 w-4" /> Adicionar
             </button>
           ) : (
-            <div className="flex items-center gap-2">
-              <button onClick={onRemove} className="h-9 w-9 rounded-xl border-2 border-border flex items-center justify-center hover:border-primary transition active:scale-90">
-                <Minus className="h-4 w-4" />
+            <div className="flex items-center gap-1.5">
+              <button onClick={onRemove} className="h-8 w-8 rounded-xl border-2 border-border flex items-center justify-center hover:border-primary transition active:scale-90">
+                <Minus className="h-3.5 w-3.5" />
               </button>
-              <span className="font-bold text-lg w-6 text-center tabular-nums">{qty}</span>
-              <button onClick={onAdd} className="h-9 w-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition active:scale-90">
-                <Plus className="h-4 w-4" />
+              <span className="font-bold text-base w-5 text-center tabular-nums">{qty}</span>
+              <button onClick={onAdd} className="h-8 w-8 rounded-xl bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition active:scale-90">
+                <Plus className="h-3.5 w-3.5" />
               </button>
             </div>
           )}
