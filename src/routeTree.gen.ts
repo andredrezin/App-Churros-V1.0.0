@@ -11,9 +11,9 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ProducaoRouteImport } from './routes/producao'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as CaixaRouteImport } from './routes/caixa'
-import { Route as CardapioRouteImport } from './routes/cardapio'
 import { Route as ChamadaRouteImport } from './routes/chamada'
+import { Route as CardapioRouteImport } from './routes/cardapio'
+import { Route as CaixaRouteImport } from './routes/caixa'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -27,9 +27,9 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CaixaRoute = CaixaRouteImport.update({
-  id: '/caixa',
-  path: '/caixa',
+const ChamadaRoute = ChamadaRouteImport.update({
+  id: '/chamada',
+  path: '/chamada',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CardapioRoute = CardapioRouteImport.update({
@@ -37,9 +37,9 @@ const CardapioRoute = CardapioRouteImport.update({
   path: '/cardapio',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ChamadaRoute = ChamadaRouteImport.update({
-  id: '/chamada',
-  path: '/chamada',
+const CaixaRoute = CaixaRouteImport.update({
+  id: '/caixa',
+  path: '/caixa',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -83,10 +83,32 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/caixa' | '/cardapio' | '/chamada' | '/login' | '/producao'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/caixa'
+    | '/cardapio'
+    | '/chamada'
+    | '/login'
+    | '/producao'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/caixa' | '/cardapio' | '/chamada' | '/login' | '/producao'
-  id: '__root__' | '/' | '/admin' | '/caixa' | '/cardapio' | '/chamada' | '/login' | '/producao'
+  to:
+    | '/'
+    | '/admin'
+    | '/caixa'
+    | '/cardapio'
+    | '/chamada'
+    | '/login'
+    | '/producao'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/caixa'
+    | '/cardapio'
+    | '/chamada'
+    | '/login'
+    | '/producao'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -115,11 +137,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/caixa': {
-      id: '/caixa'
-      path: '/caixa'
-      fullPath: '/caixa'
-      preLoaderRoute: typeof CaixaRouteImport
+    '/chamada': {
+      id: '/chamada'
+      path: '/chamada'
+      fullPath: '/chamada'
+      preLoaderRoute: typeof ChamadaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cardapio': {
@@ -129,11 +151,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CardapioRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/chamada': {
-      id: '/chamada'
-      path: '/chamada'
-      fullPath: '/chamada'
-      preLoaderRoute: typeof ChamadaRouteImport
+    '/caixa': {
+      id: '/caixa'
+      path: '/caixa'
+      fullPath: '/caixa'
+      preLoaderRoute: typeof CaixaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
