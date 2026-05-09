@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(supabase projects *)"
+      "Bash(supabase projects *)",
+      "Bash(vercel --prebuilt --scope andres-projects-30d23e00)"
     ]
   }
 }
