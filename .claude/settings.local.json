@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/Admin/Downloads/synapse.cursor-main/skills/**)",
+      "Read(//c/Users/Admin/Downloads/synapse.cursor-main/.agent/skills/**)",
+      "Read(//c/Users/Admin/.claude/**)",
+      "Bash(mkdir -p \"c:/Users/Admin/.claude/plugins/marketplaces/synapse-local/plugins/supabase/.claude-plugin\")",
+      "Bash(mkdir -p \"c:/Users/Admin/.claude/plugins/marketplaces/synapse-local/plugins/supabase/skills/supabase\")",
+      "Bash(mkdir -p \"c:/Users/Admin/.claude/plugins/marketplaces/synapse-local/plugins/github/.claude-plugin\")",
+      "Bash(mkdir -p \"c:/Users/Admin/.claude/plugins/marketplaces/synapse-local/plugins/github/skills/github\")",
+      "Bash(mkdir -p \"c:/Users/Admin/.claude/plugins/marketplaces/synapse-local/plugins/vercel-deploy/.claude-plugin\")",
+      "Bash(cp c:/Users/Admin/Downloads/synapse.cursor-main/skills/supabase/SKILL.md c:/Users/Admin/.claude/plugins/marketplaces/synapse-local/plugins/supabase/skills/supabase/SKILL.md)",
+      "Bash(cp c:/Users/Admin/Downloads/synapse.cursor-main/skills/github/SKILL.md c:/Users/Admin/.claude/plugins/marketplaces/synapse-local/plugins/github/skills/github/SKILL.md)",
+      "Bash(cp c:/Users/Admin/Downloads/synapse.cursor-main/skills/vercel-deploy/SKILL.md c:/Users/Admin/.claude/plugins/marketplaces/synapse-local/plugins/vercel-deploy/skills/vercel-deploy/SKILL.md)",
+      "Bash(cp c:/Users/Admin/Downloads/synapse.cursor-main/skills/frontend-design-3/SKILL.md c:/Users/Admin/.claude/plugins/marketplaces/synapse-local/plugins/frontend-design/skills/frontend-design/SKILL.md)",
+      "Bash(cp c:/Users/Admin/Downloads/synapse.cursor-main/.agent/skills/performance-monitoring/SKILL.md c:/Users/Admin/.claude/plugins/marketplaces/synapse-local/plugins/performance-monitoring/skills/performance-monitoring/SKILL.md)",
+      "Bash(supabase db *)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\Admin\\.claude\\plugins\\marketplaces\\synapse-local\\plugins\\vibe-coding\\skills\\vibe-coding"
+    ]
+  }
+}
