@@ -7,9 +7,7 @@ let _server = null;
 
 async function getServer() {
   if (!_server) {
-    const { default: s } = await import(
-      resolve(__dirname, "../dist/server/server.js")
-    );
+    const { default: s } = await import("../dist/server/server.js");
     _server = s;
   }
   return _server;
