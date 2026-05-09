@@ -15,7 +15,7 @@ export type MetodoPagamento = "dinheiro" | "pix" | "cartao";
 export type Pedido = {
   id: string; numero_dia: number; data_pedido: string; status: PedidoStatus;
   metodo_pagamento: MetodoPagamento; total: number; observacao: string | null;
-  criado_em: string; finalizado_em: string | null;
+  nome_cliente: string | null; criado_em: string; finalizado_em: string | null;
 };
 
 export type ItemPedido = {

@@ -1,19 +1,23 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Banknote, CreditCard, QrCode } from "lucide-react";
+import { Banknote, CreditCard, QrCode, User } from "lucide-react";
 import type { MetodoPagamento } from "@/lib/pos-types";
 import { brl } from "@/lib/format";
+
+type Step = "nome" | "metodo" | "troco";
 
 export function PaymentDialog({
   open, onClose, total, onConfirm,
 }: {
   open: boolean; onClose: () => void; total: number;
-  onConfirm: (m: MetodoPagamento) => void;
+  onConfirm: (m: MetodoPagamento, nome: string) => void;
 }) {
-  const [metodo, setMetodo] = useState<MetodoPagamento | null>(null);
+  const [step, setStep] = useState<Step>("nome");
+  const [nome, setNome] = useState("");
   const [recebido, setRecebido] = useState("");
+  const nomeRef = useRef<HTMLInputElement>(null);
 
   const troco = (() => {
     const v = parseFloat(recebido.replace(",", "."));
@@ -21,40 +25,81 @@ export function PaymentDialog({
     return v - total;
   })();
 
-  const handleConfirm = (m: MetodoPagamento) => {
-    if (m === "dinheiro") {
-      setMetodo(m);
-    } else {
-      onConfirm(m);
-    }
-  };
-
   const handleClose = () => {
-    setMetodo(null);
+    setStep("nome");
+    setNome("");
     setRecebido("");
     onClose();
   };
 
+  const handleMetodo = (m: MetodoPagamento) => {
+    if (m === "dinheiro") { setStep("troco"); }
+    else { onConfirm(m, nome); handleClose(); }
+  };
+
   const handleFinalizarDinheiro = () => {
-    onConfirm("dinheiro");
-    setMetodo(null);
-    setRecebido("");
+    onConfirm("dinheiro", nome);
+    handleClose();
   };
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display text-2xl">Forma de pagamento</DialogTitle>
+          <DialogTitle className="font-display text-2xl">
+            {step === "nome" ? "Identificação do cliente" : "Forma de pagamento"}
+          </DialogTitle>
         </DialogHeader>
 
-        <div className="text-center py-4">
+        <div className="text-center py-2">
           <div className="text-sm text-muted-foreground">Total</div>
           <div className="font-display text-5xl font-bold text-gold">{brl(total)}</div>
         </div>
 
-        {metodo === "dinheiro" ? (
-          /* Tela de troco */
+        {step === "nome" && (
+          <div className="space-y-4">
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                ref={nomeRef}
+                autoFocus
+                placeholder="Nome do cliente (opcional)"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && setStep("metodo")}
+                className="pl-9 h-12 text-base"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground text-center">
+              Ajuda a identificar o pedido na tela de produção
+            </p>
+            <Button className="w-full h-12 bg-brand-gradient text-base font-bold" onClick={() => setStep("metodo")}>
+              Continuar
+            </Button>
+          </div>
+        )}
+
+        {step === "metodo" && (
+          <>
+            {nome && (
+              <div className="flex items-center gap-2 text-sm bg-secondary rounded-lg px-3 py-2">
+                <User className="h-4 w-4 text-gold shrink-0" />
+                <span className="font-semibold truncate">{nome}</span>
+                <button onClick={() => setStep("nome")} className="ml-auto text-muted-foreground hover:text-foreground text-xs underline">editar</button>
+              </div>
+            )}
+            <div className="grid grid-cols-3 gap-3">
+              <PayBtn icon={<Banknote className="h-8 w-8" />} label="Dinheiro" onClick={() => handleMetodo("dinheiro")} />
+              <PayBtn icon={<QrCode className="h-8 w-8" />} label="PIX" onClick={() => handleMetodo("pix")} />
+              <PayBtn icon={<CreditCard className="h-8 w-8" />} label="Cartão" onClick={() => handleMetodo("cartao")} />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setStep("nome")} className="w-full">Voltar</Button>
+            </DialogFooter>
+          </>
+        )}
+
+        {step === "troco" && (
           <div className="space-y-4">
             <div>
               <label className="text-sm text-muted-foreground mb-1 block">Valor recebido (R$)</label>
@@ -83,39 +128,20 @@ export function PaymentDialog({
 
             <div className="grid grid-cols-3 gap-2">
               {[20, 50, 100].map((v) => (
-                <button
-                  key={v}
-                  onClick={() => setRecebido(String(v))}
-                  className="rounded-lg border border-border bg-secondary py-2 text-sm font-semibold hover:border-primary transition"
-                >
+                <button key={v} onClick={() => setRecebido(String(v))}
+                  className="rounded-lg border border-border bg-secondary py-2 text-sm font-semibold hover:border-primary transition">
                   R$ {v}
                 </button>
               ))}
             </div>
 
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setMetodo(null)}>Voltar</Button>
-              <Button
-                className="flex-1 bg-brand-gradient hover:opacity-90"
-                disabled={troco === null}
-                onClick={handleFinalizarDinheiro}
-              >
+              <Button variant="outline" className="flex-1" onClick={() => setStep("metodo")}>Voltar</Button>
+              <Button className="flex-1 bg-brand-gradient hover:opacity-90" disabled={troco === null} onClick={handleFinalizarDinheiro}>
                 Confirmar
               </Button>
             </div>
           </div>
-        ) : (
-          /* Seleção de método */
-          <>
-            <div className="grid grid-cols-3 gap-3">
-              <PayBtn icon={<Banknote className="h-8 w-8" />} label="Dinheiro" onClick={() => handleConfirm("dinheiro")} />
-              <PayBtn icon={<QrCode className="h-8 w-8" />} label="PIX" onClick={() => handleConfirm("pix")} />
-              <PayBtn icon={<CreditCard className="h-8 w-8" />} label="Cartão" onClick={() => handleConfirm("cartao")} />
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={handleClose} className="w-full">Cancelar</Button>
-            </DialogFooter>
-          </>
         )}
       </DialogContent>
     </Dialog>

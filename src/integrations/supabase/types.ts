@@ -206,6 +206,7 @@ export type Database = {
           finalizado_em: string | null
           id: string
           metodo_pagamento: Database["public"]["Enums"]["metodo_pagamento"]
+          nome_cliente: string | null
           numero_dia: number
           observacao: string | null
           status: Database["public"]["Enums"]["pedido_status"]
@@ -218,6 +219,7 @@ export type Database = {
           finalizado_em?: string | null
           id?: string
           metodo_pagamento: Database["public"]["Enums"]["metodo_pagamento"]
+          nome_cliente?: string | null
           numero_dia: number
           observacao?: string | null
           status?: Database["public"]["Enums"]["pedido_status"]
@@ -230,6 +232,7 @@ export type Database = {
           finalizado_em?: string | null
           id?: string
           metodo_pagamento?: Database["public"]["Enums"]["metodo_pagamento"]
+          nome_cliente?: string | null
           numero_dia?: number
           observacao?: string | null
           status?: Database["public"]["Enums"]["pedido_status"]

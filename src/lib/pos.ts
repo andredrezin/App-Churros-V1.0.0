@@ -41,6 +41,7 @@ export async function criarPedido(
   itens: CartItem[],
   metodo: MetodoPagamento,
   userId: string,
+  nomeCliente?: string,
 ): Promise<Pedido | null> {
   const { data: numData, error: numErr } = await supabase.rpc("proximo_numero_pedido");
   if (numErr || numData == null) { toast.error("Erro ao gerar número do pedido"); return null; }
@@ -52,6 +53,7 @@ export async function criarPedido(
     .insert({
       numero_dia: numero, status: "aguardando", metodo_pagamento: metodo,
       total, criado_por: userId,
+      nome_cliente: nomeCliente?.trim() || null,
     })
     .select().single();
 

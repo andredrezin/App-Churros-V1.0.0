@@ -11,9 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, CartesianGrid } from "recharts";
 import { QRCodeSVG } from "qrcode.react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import {
   LogOut, Crown, Download, TrendingUp, Package, Clock, DollarSign,
-  Upload, QrCode, Share2, ExternalLink, ImageOff,
+  Upload, QrCode, Share2, ExternalLink, ImageOff, Plus, Pencil, Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -41,13 +43,15 @@ function AdminPage() {
       </header>
 
       <Tabs defaultValue="dashboard" className="p-4">
-        <TabsList className="grid grid-cols-5 w-full max-w-2xl">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="cardapio">Cardápio</TabsTrigger>
-          <TabsTrigger value="historico">Histórico</TabsTrigger>
-          <TabsTrigger value="fechamento">Fechamento</TabsTrigger>
-          <TabsTrigger value="qrcode">QR Code</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-1">
+          <TabsList className="flex min-w-max gap-0.5">
+            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="cardapio">Cardápio</TabsTrigger>
+            <TabsTrigger value="historico">Histórico</TabsTrigger>
+            <TabsTrigger value="fechamento">Fechamento</TabsTrigger>
+            <TabsTrigger value="qrcode">QR Code</TabsTrigger>
+          </TabsList>
+        </div>
         <TabsContent value="dashboard" className="mt-4"><Dashboard /></TabsContent>
         <TabsContent value="cardapio" className="mt-4"><Cardapio /></TabsContent>
         <TabsContent value="historico" className="mt-4"><Historico /></TabsContent>
@@ -213,6 +217,11 @@ function Dashboard() {
 
 type ProdutoFoto = { id: string; produto_id: string; url: string; ordem: number };
 
+type ProdutoForm = {
+  nome: string; descricao: string; categoria_id: string; preco_base: string; ativo: boolean;
+};
+const FORM_VAZIO: ProdutoForm = { nome: "", descricao: "", categoria_id: "", preco_base: "", ativo: true };
+
 function Cardapio() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [cats, setCats] = useState<Categoria[]>([]);
@@ -220,6 +229,10 @@ function Cardapio() {
   const [uploading, setUploading] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadingProdId = useRef<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editando, setEditando] = useState<Produto | null>(null);
+  const [form, setForm] = useState<ProdutoForm>(FORM_VAZIO);
+  const [saving, setSaving] = useState(false);
 
   const reload = async () => {
     const [p, c, f] = await Promise.all([
@@ -233,17 +246,50 @@ function Cardapio() {
   };
   useEffect(() => { reload(); }, []);
 
-  const toggle = async (p: Produto) => {
-    await supabase.from("produtos").update({ ativo: !p.ativo }).eq("id", p.id);
-    toast.success(`${p.nome} ${!p.ativo ? "ativado" : "desativado"}`);
+  const abrirNovo = () => {
+    setEditando(null);
+    setForm({ ...FORM_VAZIO, categoria_id: cats[0]?.id ?? "" });
+    setDialogOpen(true);
+  };
+
+  const abrirEditar = (p: Produto) => {
+    setEditando(p);
+    setForm({ nome: p.nome, descricao: p.descricao ?? "", categoria_id: p.categoria_id, preco_base: p.preco_base.toFixed(2), ativo: p.ativo });
+    setDialogOpen(true);
+  };
+
+  const salvar = async () => {
+    const preco = parseFloat(form.preco_base.replace(",", "."));
+    if (!form.nome.trim()) { toast.error("Nome obrigatório"); return; }
+    if (!form.categoria_id) { toast.error("Selecione uma categoria"); return; }
+    if (isNaN(preco) || preco < 0) { toast.error("Preço inválido"); return; }
+    setSaving(true);
+    const payload = { nome: form.nome.trim(), descricao: form.descricao.trim() || null, categoria_id: form.categoria_id, preco_base: preco, ativo: form.ativo };
+    if (editando) {
+      const { error } = await supabase.from("produtos").update(payload).eq("id", editando.id);
+      if (error) { toast.error("Erro ao salvar: " + error.message); setSaving(false); return; }
+      toast.success("Produto atualizado!");
+    } else {
+      const { error } = await supabase.from("produtos").insert({ ...payload, esgotado: false });
+      if (error) { toast.error("Erro ao criar: " + error.message); setSaving(false); return; }
+      toast.success("Produto criado!");
+    }
+    setSaving(false);
+    setDialogOpen(false);
     reload();
   };
 
-  const updatePreco = async (p: Produto, v: string) => {
-    const n = parseFloat(v.replace(",", "."));
-    if (isNaN(n)) return;
-    await supabase.from("produtos").update({ preco_base: n }).eq("id", p.id);
-    toast.success("Preço atualizado");
+  const excluir = async (p: Produto) => {
+    if (!confirm(`Excluir "${p.nome}"? Esta ação não pode ser desfeita.`)) return;
+    await supabase.from("produto_fotos").delete().eq("produto_id", p.id);
+    await supabase.from("produtos").delete().eq("id", p.id);
+    toast.success("Produto excluído");
+    reload();
+  };
+
+  const toggle = async (p: Produto) => {
+    await supabase.from("produtos").update({ ativo: !p.ativo }).eq("id", p.id);
+    toast.success(`${p.nome} ${!p.ativo ? "ativado" : "desativado"}`);
     reload();
   };
 
@@ -257,26 +303,19 @@ function Cardapio() {
     const prodId = uploadingProdId.current;
     if (!files.length || !prodId) return;
     e.target.value = "";
-
     setUploading(prodId);
     const existingOrdem = fotos.filter((f) => f.produto_id === prodId).length;
-
     await Promise.all(files.map(async (file, idx) => {
       const ext = file.name.split(".").pop();
       const path = `${prodId}/${crypto.randomUUID()}.${ext}`;
       const { error: upErr } = await supabase.storage.from("produto-fotos").upload(path, file);
       if (upErr) { toast.error("Erro no upload: " + upErr.message); return; }
       const { data: urlData } = supabase.storage.from("produto-fotos").getPublicUrl(path);
-      await supabase.from("produto_fotos").insert({
-        produto_id: prodId, url: urlData.publicUrl, ordem: existingOrdem + idx,
-      });
+      await supabase.from("produto_fotos").insert({ produto_id: prodId, url: urlData.publicUrl, ordem: existingOrdem + idx });
     }));
-
-    // sincroniza foto_url do produto com a primeira foto
     const primeiraFoto = fotos.find((f) => f.produto_id === prodId)?.url
       ?? (await supabase.from("produto_fotos").select("url").eq("produto_id", prodId).order("ordem").limit(1).single()).data?.url;
     if (primeiraFoto) await supabase.from("produtos").update({ foto_url: primeiraFoto }).eq("id", prodId);
-
     toast.success(`${files.length} foto(s) adicionada(s)!`);
     setUploading(null);
     reload();
@@ -284,14 +323,10 @@ function Cardapio() {
 
   const removerFoto = async (foto: ProdutoFoto) => {
     await supabase.from("produto_fotos").delete().eq("id", foto.id);
-    // extrai path do storage a partir da URL pública
     const path = foto.url.split("/produto-fotos/")[1];
     if (path) await supabase.storage.from("produto-fotos").remove([path]);
-
-    // atualiza foto_url no produto
     const restantes = fotos.filter((f) => f.produto_id === foto.produto_id && f.id !== foto.id);
     await supabase.from("produtos").update({ foto_url: restantes[0]?.url ?? null }).eq("id", foto.produto_id);
-
     toast.success("Foto removida");
     reload();
   };
@@ -299,71 +334,105 @@ function Cardapio() {
   return (
     <div className="space-y-4">
       <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFotoUpload} />
-      {cats.map((c) => (
-        <div key={c.id} className="rounded-2xl border bg-card p-4">
-          <h3 className="font-display text-xl font-bold text-gold mb-3">{c.nome}</h3>
-          <div className="space-y-4">
-            {produtos.filter((p) => p.categoria_id === c.id).map((p) => {
-              const prodFotos = fotos.filter((f) => f.produto_id === p.id).sort((a, b) => a.ordem - b.ordem);
-              return (
-                <div key={p.id} className="rounded-lg bg-secondary/40 p-3">
-                  {/* Linha principal: nome, preço, ativo */}
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="flex-1">
-                      <div className="font-semibold">{p.nome}</div>
-                      {p.descricao && <div className="text-xs text-muted-foreground">{p.descricao}</div>}
-                    </div>
-                    <Input
-                      defaultValue={p.preco_base.toFixed(2)}
-                      onBlur={(e) => updatePreco(p, e.target.value)}
-                      className="w-24 text-right"
-                    />
-                    <Switch checked={p.ativo} onCheckedChange={() => toggle(p)} />
-                  </div>
 
-                  {/* Galeria de fotos */}
-                  <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                    {prodFotos.map((foto, idx) => (
-                      <div key={foto.id} className="relative shrink-0 group">
-                        <img src={foto.url} alt={`${p.nome} ${idx + 1}`} className="h-20 w-20 rounded-lg object-cover" />
-                        {idx === 0 && (
-                          <span className="absolute top-1 left-1 text-[10px] font-bold bg-gold text-black px-1 rounded">capa</span>
-                        )}
-                        <button
-                          onClick={() => removerFoto(foto)}
-                          className="absolute inset-0 bg-black/60 rounded-lg opacity-0 group-hover:opacity-100 flex items-center justify-center transition"
-                        >
-                          <ImageOff className="h-4 w-4 text-white" />
-                        </button>
+      <div className="flex justify-end">
+        <Button onClick={abrirNovo} className="bg-brand-gradient gap-2">
+          <Plus className="h-4 w-4" /> Novo Produto
+        </Button>
+      </div>
+
+      {cats.map((c) => {
+        const prods = produtos.filter((p) => p.categoria_id === c.id);
+        if (!prods.length) return null;
+        return (
+          <div key={c.id} className="rounded-2xl border bg-card p-4">
+            <h3 className="font-display text-xl font-bold text-gold mb-3">{c.nome}</h3>
+            <div className="space-y-4">
+              {prods.map((p) => {
+                const prodFotos = fotos.filter((f) => f.produto_id === p.id).sort((a, b) => a.ordem - b.ordem);
+                return (
+                  <div key={p.id} className={`rounded-lg p-3 border ${p.ativo ? "bg-secondary/40 border-border" : "bg-secondary/10 border-border/30 opacity-60"}`}>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold truncate">{p.nome}</div>
+                        {p.descricao && <div className="text-xs text-muted-foreground line-clamp-1">{p.descricao}</div>}
+                        <div className="text-sm font-bold text-gold mt-0.5">{brl(p.preco_base)}</div>
                       </div>
-                    ))}
-
-                    {/* Botão de adicionar fotos */}
-                    <button
-                      onClick={() => handleFotoClick(p.id)}
-                      disabled={uploading === p.id}
-                      className="h-20 w-20 shrink-0 rounded-lg border-2 border-dashed border-border hover:border-primary flex flex-col items-center justify-center gap-1 transition"
-                    >
-                      {uploading === p.id
-                        ? <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                        : <>
-                          <Upload className="h-5 w-5 text-muted-foreground" />
-                          <span className="text-[10px] text-muted-foreground">Adicionar</span>
-                        </>}
-                    </button>
+                      <Switch checked={p.ativo} onCheckedChange={() => toggle(p)} title={p.ativo ? "Ativo" : "Inativo"} />
+                      <Button size="icon" variant="ghost" onClick={() => abrirEditar(p)} className="h-8 w-8">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => excluir(p)} className="h-8 w-8 text-destructive hover:text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                      {prodFotos.map((foto, idx) => (
+                        <div key={foto.id} className="relative shrink-0 group">
+                          <img src={foto.url} alt={`${p.nome} ${idx + 1}`} className="h-20 w-20 rounded-lg object-cover" />
+                          {idx === 0 && <span className="absolute top-1 left-1 text-[10px] font-bold bg-gold text-black px-1 rounded">capa</span>}
+                          <button onClick={() => removerFoto(foto)} className="absolute inset-0 bg-black/60 rounded-lg opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                            <ImageOff className="h-4 w-4 text-white" />
+                          </button>
+                        </div>
+                      ))}
+                      <button onClick={() => handleFotoClick(p.id)} disabled={uploading === p.id}
+                        className="h-20 w-20 shrink-0 rounded-lg border-2 border-dashed border-border hover:border-primary flex flex-col items-center justify-center gap-1 transition">
+                        {uploading === p.id
+                          ? <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                          : <><Upload className="h-5 w-5 text-muted-foreground" /><span className="text-[10px] text-muted-foreground">Foto</span></>}
+                      </button>
+                    </div>
                   </div>
-                  {prodFotos.length === 0 && (
-                    <p className="text-xs text-muted-foreground mt-1">Sem fotos — clique em "Adicionar" para fazer upload (múltiplas de uma vez)</p>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
-      <p className="text-xs text-muted-foreground text-center">
-        Bucket <strong>produto-fotos</strong> (público) obrigatório no Supabase Storage
-      </p>
+        );
+      })}
+
+      {/* Dialog criar/editar */}
+      <Dialog open={dialogOpen} onOpenChange={(v) => !v && setDialogOpen(false)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl">{editando ? "Editar Produto" : "Novo Produto"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm text-muted-foreground">Nome *</label>
+              <Input value={form.nome} onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))} placeholder="Ex: Churro de Doce de Leite" />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground">Descrição</label>
+              <Textarea value={form.descricao} onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))} placeholder="Descreva o produto..." rows={2} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm text-muted-foreground">Categoria *</label>
+                <select value={form.categoria_id} onChange={(e) => setForm((f) => ({ ...f, categoria_id: e.target.value }))}
+                  className="w-full h-9 rounded-md border bg-input px-2 text-sm">
+                  <option value="">Selecionar…</option>
+                  {cats.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground">Preço (R$) *</label>
+                <Input inputMode="decimal" placeholder="0,00" value={form.preco_base} onChange={(e) => setForm((f) => ({ ...f, preco_base: e.target.value }))} />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch checked={form.ativo} onCheckedChange={(v) => setForm((f) => ({ ...f, ativo: v }))} />
+              <span className="text-sm">{form.ativo ? "Ativo (aparece no cardápio)" : "Inativo (oculto)"}</span>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={salvar} disabled={saving} className="bg-brand-gradient">
+              {saving ? "Salvando…" : editando ? "Salvar" : "Criar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

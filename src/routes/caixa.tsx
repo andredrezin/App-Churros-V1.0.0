@@ -53,10 +53,10 @@ function CaixaPage() {
 
   const remover = (uid: string) => setCart((c) => c.filter((i) => i.uid !== uid));
 
-  const finalizar = async (metodo: MetodoPagamento) => {
+  const finalizar = async (metodo: MetodoPagamento, nomeCliente: string) => {
     if (!user) return;
     setPayOpen(false);
-    const pedido = await criarPedido(cart, metodo, user.id);
+    const pedido = await criarPedido(cart, metodo, user.id, nomeCliente);
     if (pedido) {
       setConfirmNum(pedido.numero_dia);
       setCart([]);

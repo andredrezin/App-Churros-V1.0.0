@@ -1,22 +1,34 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { brl } from "@/lib/format";
 import type { Categoria, Produto } from "@/lib/pos-types";
-import { Flame, ChevronLeft, ChevronRight, QrCode } from "lucide-react";
+import {
+  Flame, ChevronLeft, ChevronRight, ShoppingCart, Plus, Minus,
+  Trash2, MessageCircle, MapPin, Clock, Star, X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 
+// ── Configuração ──────────────────────────────────────────────
+const WHATSAPP_TEL = "5511999999999"; // ← troque pelo número real com DDI+DDD
+
+// ─────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/cardapio")({
   component: CardapioPublico,
 });
 
 type Foto = { id: string; produto_id: string; url: string; ordem: number };
+type CartEntry = { produto: Produto; quantidade: number };
 
 export default function CardapioPublico() {
   const [cats, setCats] = useState<Categoria[]>([]);
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [fotos, setFotos] = useState<Foto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [catFilter, setCatFilter] = useState<string>("todos");
+  const [cart, setCart] = useState<CartEntry[]>([]);
+  const [cartOpen, setCartOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -32,86 +44,257 @@ export default function CardapioPublico() {
     })();
   }, []);
 
+  const addToCart = (produto: Produto) => {
+    setCart((prev) => {
+      const existing = prev.find((e) => e.produto.id === produto.id);
+      if (existing) return prev.map((e) => e.produto.id === produto.id ? { ...e, quantidade: e.quantidade + 1 } : e);
+      return [...prev, { produto, quantidade: 1 }];
+    });
+  };
+
+  const removeOne = (id: string) => {
+    setCart((prev) => {
+      const existing = prev.find((e) => e.produto.id === id);
+      if (!existing) return prev;
+      if (existing.quantidade <= 1) return prev.filter((e) => e.produto.id !== id);
+      return prev.map((e) => e.produto.id === id ? { ...e, quantidade: e.quantidade - 1 } : e);
+    });
+  };
+
+  const removeAll = (id: string) => setCart((prev) => prev.filter((e) => e.produto.id !== id));
+
+  const cartTotal = useMemo(() => cart.reduce((s, e) => s + e.produto.preco_base * e.quantidade, 0), [cart]);
+  const cartCount = useMemo(() => cart.reduce((s, e) => s + e.quantidade, 0), [cart]);
+
+  const pedirWhatsApp = () => {
+    if (!cart.length) return;
+    const lines = cart.map((e) => `• ${e.quantidade}x ${e.produto.nome} — ${brl(e.produto.preco_base * e.quantidade)}`);
+    const msg = [
+      "Olá! Quero fazer um pedido 😊",
+      "",
+      ...lines,
+      "",
+      `*Total: ${brl(cartTotal)}*`,
+      "",
+      "Posso confirmar?",
+    ].join("\n");
+    window.open(`https://wa.me/${WHATSAPP_TEL}?text=${encodeURIComponent(msg)}`, "_blank");
+  };
+
+  const filteredProdutos = useMemo(() => {
+    if (catFilter === "todos") return produtos;
+    return produtos.filter((p) => p.categoria_id === catFilter);
+  }, [produtos, catFilter]);
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-brand-gradient py-6 px-4 text-center shadow-warm">
-        <img src="/logo.png" alt="Churros Crocantes" className="h-28 mx-auto drop-shadow-lg" />
-        <p className="text-white/80 text-lg mt-1">Cardápio • Preços em Reais</p>
-      </header>
+      {/* ── Hero ── */}
+      <section className="relative overflow-hidden bg-brand-gradient py-14 px-4 text-center">
+        {/* Decoração de fundo */}
+        <div className="absolute inset-0 opacity-10 pointer-events-none select-none">
+          {["🌀","🌀","🌀","🌀","🌀","🌀"].map((e, i) => (
+            <span key={i} className="absolute text-6xl" style={{ top: `${[10,60,30,80,15,70][i]}%`, left: `${[5,15,40,55,75,90][i]}%`, transform: "rotate(-20deg)" }}>{e}</span>
+          ))}
+        </div>
 
-      <div className="max-w-3xl mx-auto px-4 py-8 space-y-10">
+        <div className="relative z-10">
+          <div className="inline-flex items-center justify-center h-20 w-20 rounded-full bg-white/15 mb-4 shadow-warm">
+            <Flame className="h-10 w-10 text-white" />
+          </div>
+          <h1 className="font-display text-5xl font-black text-white drop-shadow-lg">Churros Crocantes</h1>
+          <p className="text-white/85 text-xl mt-2 font-medium">Artesanais • Fresquinhos • Irresistíveis</p>
+
+          <div className="mt-6 flex flex-wrap justify-center gap-4 text-white/80 text-sm">
+            <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-gold" /> Barraca de rua</span>
+            <span className="flex items-center gap-1.5"><Clock className="h-4 w-4 text-gold" /> Feitos na hora</span>
+            <span className="flex items-center gap-1.5"><Star className="h-4 w-4 text-gold fill-gold" /> Receita artesanal</span>
+          </div>
+
+          <Button
+            onClick={() => document.getElementById("cardapio-section")?.scrollIntoView({ behavior: "smooth" })}
+            className="mt-8 h-12 px-8 text-base font-bold bg-gold text-black hover:bg-gold/90 shadow-warm"
+          >
+            Ver cardápio ↓
+          </Button>
+        </div>
+      </section>
+
+      {/* ── Destaques ── */}
+      <section className="bg-card/60 py-8 px-4 border-b border-border">
+        <div className="max-w-3xl mx-auto grid grid-cols-3 gap-4 text-center">
+          {[
+            { emoji: "🔥", title: "Fresquinhos", desc: "Feitos na hora do pedido" },
+            { emoji: "🍫", title: "Recheios", desc: "Doce de leite, chocolate e mais" },
+            { emoji: "💛", title: "Amor", desc: "Receita da família há anos" },
+          ].map((item) => (
+            <div key={item.title} className="flex flex-col items-center gap-1">
+              <span className="text-3xl">{item.emoji}</span>
+              <span className="font-display font-bold text-sm">{item.title}</span>
+              <span className="text-xs text-muted-foreground hidden sm:block">{item.desc}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Cardápio ── */}
+      <section id="cardapio-section" className="max-w-3xl mx-auto px-4 py-10">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="font-display text-3xl font-bold">Cardápio</h2>
+          {cartCount > 0 && (
+            <button onClick={() => setCartOpen(true)} className="flex items-center gap-2 text-sm font-semibold text-gold">
+              <ShoppingCart className="h-4 w-4" />{cartCount} {cartCount === 1 ? "item" : "itens"}
+            </button>
+          )}
+        </div>
+
+        {/* Filtro por categoria */}
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-6 no-scrollbar">
+          <FilterBtn active={catFilter === "todos"} onClick={() => setCatFilter("todos")}>Todos</FilterBtn>
+          {cats.map((c) => (
+            <FilterBtn key={c.id} active={catFilter === c.id} onClick={() => setCatFilter(c.id)}>{c.nome}</FilterBtn>
+          ))}
+        </div>
+
         {loading ? (
           <div className="text-center py-20 text-muted-foreground">Carregando cardápio…</div>
         ) : (
-          cats.map((cat) => {
-            const itens = produtos.filter((p) => p.categoria_id === cat.id);
-            if (!itens.length) return null;
-            return (
-              <section key={cat.id}>
-                <h2 className="font-display text-3xl font-bold text-gold mb-5 border-b border-gold/20 pb-2">{cat.nome}</h2>
-                <div className="grid sm:grid-cols-2 gap-5">
-                  {itens.map((p) => {
-                    const prodFotos = fotos.filter((f) => f.produto_id === p.id).sort((a, b) => a.ordem - b.ordem);
-                    return <ProdutoCard key={p.id} produto={p} fotos={prodFotos} />;
-                  })}
-                </div>
-              </section>
-            );
-          })
-        )}
-
-        {/* Rodapé */}
-        <footer className="text-center pt-6 border-t border-border">
-          <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
-            <QrCode className="h-4 w-4" />
-            <span>Escaneie o QR Code na barraca para ver o cardápio atualizado</span>
+          <div className="grid sm:grid-cols-2 gap-5">
+            {filteredProdutos.map((p) => {
+              const prodFotos = fotos.filter((f) => f.produto_id === p.id).sort((a, b) => a.ordem - b.ordem);
+              const qty = cart.find((e) => e.produto.id === p.id)?.quantidade ?? 0;
+              return (
+                <ProdutoCard
+                  key={p.id} produto={p} fotos={prodFotos} qty={qty}
+                  onAdd={() => addToCart(p)} onRemove={() => removeOne(p.id)}
+                />
+              );
+            })}
           </div>
-          <p className="text-xs text-muted-foreground/50 mt-2">Preços sujeitos a alteração. Itens esgotados podem não estar disponíveis.</p>
-        </footer>
-      </div>
+        )}
+      </section>
+
+      {/* ── CTA WhatsApp fixo no fundo ── */}
+      {cartCount > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 p-4 bg-background/95 backdrop-blur border-t border-border">
+          <div className="max-w-3xl mx-auto flex gap-3">
+            <button
+              onClick={() => setCartOpen(true)}
+              className="flex items-center gap-2 px-4 py-3 rounded-xl border-2 border-gold/30 bg-gold/10 text-gold font-semibold text-sm"
+            >
+              <ShoppingCart className="h-5 w-5" />
+              {cartCount} {cartCount === 1 ? "item" : "itens"} • {brl(cartTotal)}
+            </button>
+            <Button
+              onClick={pedirWhatsApp}
+              className="flex-1 h-12 text-base font-bold bg-[#25D366] hover:bg-[#1ebe5c] text-white gap-2"
+            >
+              <MessageCircle className="h-5 w-5" />
+              Pedir via WhatsApp
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Drawer do carrinho ── */}
+      {cartOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center sm:items-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setCartOpen(false)} />
+          <div className="relative w-full sm:max-w-md bg-card rounded-t-3xl sm:rounded-2xl border border-border shadow-2xl p-5 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display text-2xl font-bold flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5 text-gold" /> Seu pedido
+              </h3>
+              <button onClick={() => setCartOpen(false)}><X className="h-5 w-5 text-muted-foreground" /></button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3 mb-4">
+              {cart.map((e) => (
+                <div key={e.produto.id} className="flex items-center gap-3 rounded-xl bg-secondary/50 p-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold truncate">{e.produto.nome}</div>
+                    <div className="text-sm text-gold font-bold">{brl(e.produto.preco_base * e.quantidade)}</div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button onClick={() => removeOne(e.produto.id)} className="h-8 w-8 rounded-full border border-border flex items-center justify-center hover:border-primary transition">
+                      <Minus className="h-3 w-3" />
+                    </button>
+                    <span className="font-bold w-4 text-center">{e.quantidade}</span>
+                    <button onClick={() => addToCart(e.produto)} className="h-8 w-8 rounded-full border border-border flex items-center justify-center hover:border-primary transition">
+                      <Plus className="h-3 w-3" />
+                    </button>
+                    <button onClick={() => removeAll(e.produto.id)} className="ml-1 text-destructive hover:opacity-70">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t border-border pt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground text-sm uppercase tracking-wider">Total</span>
+                <span className="font-display text-3xl font-bold text-gold">{brl(cartTotal)}</span>
+              </div>
+              <Button
+                onClick={() => { setCartOpen(false); pedirWhatsApp(); }}
+                className="w-full h-14 text-lg font-bold bg-[#25D366] hover:bg-[#1ebe5c] text-white gap-2"
+              >
+                <MessageCircle className="h-6 w-6" />
+                Pedir via WhatsApp
+              </Button>
+              <p className="text-xs text-muted-foreground text-center">
+                Você será redirecionado para o WhatsApp com o pedido preenchido
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Footer ── */}
+      <footer className={`text-center py-10 px-4 border-t border-border ${cartCount > 0 ? "pb-28" : ""}`}>
+        <div className="flex items-center justify-center gap-2 mb-3">
+          <Flame className="h-5 w-5 text-primary" />
+          <span className="font-display font-bold text-lg">Churros Crocantes</span>
+        </div>
+        <p className="text-xs text-muted-foreground">Artesanais • Feitos com amor</p>
+        <p className="text-xs text-muted-foreground/50 mt-2">Preços sujeitos a alteração sem aviso prévio.</p>
+      </footer>
     </div>
   );
 }
 
-function ProdutoCard({ produto: p, fotos }: { produto: Produto; fotos: Foto[] }) {
-  const [idx, setIdx] = useState(0);
+function FilterBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition border-2
+        ${active ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/50"}`}
+    >
+      {children}
+    </button>
+  );
+}
 
+function ProdutoCard({ produto: p, fotos, qty, onAdd, onRemove }: {
+  produto: Produto; fotos: Foto[]; qty: number; onAdd: () => void; onRemove: () => void;
+}) {
+  const [idx, setIdx] = useState(0);
   const prev = () => setIdx((i) => (i - 1 + fotos.length) % fotos.length);
   const next = () => setIdx((i) => (i + 1) % fotos.length);
 
   return (
-    <div className={`rounded-2xl border-2 bg-card overflow-hidden transition ${p.esgotado ? "opacity-50 border-border" : "border-border"}`}>
-      {/* Área de foto / carrossel */}
+    <div className={`rounded-2xl border-2 bg-card overflow-hidden transition ${p.esgotado ? "opacity-50 border-border" : "border-border hover:border-primary/40"}`}>
+      {/* Foto / carrossel */}
       {fotos.length > 0 ? (
         <div className="relative w-full h-52 bg-black select-none">
-          <img
-            src={fotos[idx].url}
-            alt={`${p.nome} ${idx + 1}`}
-            className="w-full h-full object-cover"
-          />
+          <img src={fotos[idx].url} alt={`${p.nome} ${idx + 1}`} className="w-full h-full object-cover" />
           {fotos.length > 1 && (
             <>
-              <button
-                onClick={prev}
-                className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 transition"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-              <button
-                onClick={next}
-                className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 transition"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </button>
-              {/* Indicadores */}
+              <button onClick={prev} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 transition"><ChevronLeft className="h-5 w-5" /></button>
+              <button onClick={next} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 transition"><ChevronRight className="h-5 w-5" /></button>
               <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
                 {fotos.map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setIdx(i)}
-                    className={`h-1.5 rounded-full transition-all ${i === idx ? "w-4 bg-white" : "w-1.5 bg-white/50"}`}
-                  />
+                  <button key={i} onClick={() => setIdx(i)} className={`h-1.5 rounded-full transition-all ${i === idx ? "w-4 bg-white" : "w-1.5 bg-white/50"}`} />
                 ))}
               </div>
             </>
@@ -124,14 +307,36 @@ function ProdutoCard({ produto: p, fotos }: { produto: Produto; fotos: Foto[] })
       )}
 
       <div className="p-4">
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start justify-between gap-2 mb-1">
           <h3 className="font-display text-lg font-bold leading-tight">{p.nome}</h3>
-          {p.esgotado && (
-            <span className="shrink-0 text-xs font-bold bg-destructive/20 text-destructive px-2 py-0.5 rounded-full">Esgotado</span>
+          {p.esgotado && <span className="shrink-0 text-xs font-bold bg-destructive/20 text-destructive px-2 py-0.5 rounded-full">Esgotado</span>}
+        </div>
+        {p.descricao && <p className="text-sm text-muted-foreground mb-3">{p.descricao}</p>}
+
+        <div className="flex items-center justify-between mt-3">
+          <span className="text-gold font-bold text-2xl">{brl(p.preco_base)}</span>
+
+          {p.esgotado ? (
+            <span className="text-sm text-muted-foreground">Indisponível</span>
+          ) : qty === 0 ? (
+            <button
+              onClick={onAdd}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition active:scale-95"
+            >
+              <Plus className="h-4 w-4" /> Adicionar
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button onClick={onRemove} className="h-9 w-9 rounded-xl border-2 border-border flex items-center justify-center hover:border-primary transition">
+                <Minus className="h-4 w-4" />
+              </button>
+              <span className="font-bold text-lg w-6 text-center">{qty}</span>
+              <button onClick={onAdd} className="h-9 w-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition">
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
           )}
         </div>
-        {p.descricao && <p className="text-sm text-muted-foreground mt-1">{p.descricao}</p>}
-        <div className="mt-3 text-gold font-bold text-2xl">{brl(p.preco_base)}</div>
       </div>
     </div>
   );

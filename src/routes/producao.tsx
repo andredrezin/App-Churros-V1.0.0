@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { brl, padNum } from "@/lib/format";
 import type { Pedido, ItemPedido, PedidoStatus } from "@/lib/pos-types";
 import { Button } from "@/components/ui/button";
-import { Flame, LogOut, ChefHat, RefreshCw, Wifi, WifiOff, PackageX } from "lucide-react";
+import { Flame, LogOut, ChefHat, RefreshCw, Wifi, WifiOff, PackageX, Tv, User } from "lucide-react";
 import type { Produto } from "@/lib/pos-types";
 import { toast } from "sonner";
 
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/producao")({
   component: () => <RoleGuard allow={["producao", "admin"]}><ProducaoPage /></RoleGuard>,
 });
 
-type FullPedido = Pedido & { itens: (ItemPedido & { produto_nome?: string; categoria_id?: string })[] };
+type FullPedido = Pedido & { nome_cliente?: string | null; itens: (ItemPedido & { produto_nome?: string; categoria_id?: string })[] };
 
 const STATUS_NEXT: Record<PedidoStatus, PedidoStatus | null> = {
   aguardando: "em_preparo",
@@ -207,7 +207,7 @@ function ProducaoPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filtered.map((p) => <OrderCard key={p.id} pedido={p} now={now} onAdvance={() => advance(p)} />)}
+            {filtered.map((p) => <OrderCard key={p.id} pedido={p} now={now} onAdvance={() => advance(p)} onChamarTV={() => { if (p.status !== "pronto") advance(p); }} />)}
           </div>
         )}
       </div>
@@ -246,7 +246,7 @@ function ProducaoPage() {
   );
 }
 
-function OrderCard({ pedido, now, onAdvance }: { pedido: FullPedido; now: number; onAdvance: () => void }) {
+function OrderCard({ pedido, now, onAdvance, onChamarTV }: { pedido: FullPedido; now: number; onAdvance: () => void; onChamarTV: () => void }) {
   const elapsed = Math.floor((now - new Date(pedido.criado_em).getTime()) / 1000);
   const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
   const ss = String(elapsed % 60).padStart(2, "0");
@@ -271,6 +271,11 @@ function OrderCard({ pedido, now, onAdvance }: { pedido: FullPedido; now: number
           <div className="text-2xl font-mono font-bold mt-1">{mm}:{ss}</div>
         </div>
       </div>
+      {pedido.nome_cliente && (
+        <div className="flex items-center gap-1 text-sm font-semibold text-gold mb-1">
+          <User className="h-3.5 w-3.5" />{pedido.nome_cliente}
+        </div>
+      )}
       <div className="text-xs text-muted-foreground mb-2">
         {new Date(pedido.criado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} • {brl(pedido.total)}
       </div>
@@ -283,11 +288,18 @@ function OrderCard({ pedido, now, onAdvance }: { pedido: FullPedido; now: number
           </div>
         ))}
       </div>
-      <Button onClick={onAdvance} className="w-full h-12 text-base font-bold uppercase bg-foreground/10 hover:bg-foreground/20 text-foreground">
-        {pedido.status === "aguardando" && "Iniciar preparo"}
-        {pedido.status === "em_preparo" && "Marcar como pronto"}
-        {pedido.status === "pronto" && "Entregue"}
-      </Button>
+      <div className="flex gap-2">
+        <Button onClick={onAdvance} className="flex-1 h-12 text-base font-bold uppercase bg-foreground/10 hover:bg-foreground/20 text-foreground">
+          {pedido.status === "aguardando" && "Iniciar preparo"}
+          {pedido.status === "em_preparo" && "Marcar pronto"}
+          {pedido.status === "pronto" && "Entregue"}
+        </Button>
+        {pedido.status === "em_preparo" && (
+          <Button onClick={onChamarTV} size="icon" className="h-12 w-12 bg-gold/20 hover:bg-gold/40 text-gold border border-gold/30" title="Chamar na TV">
+            <Tv className="h-5 w-5" />
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
