@@ -77,18 +77,46 @@ function Dashboard() {
   const [topItens, setTopItens] = useState<{ nome: string; qtd: number; pct: number }[]>([]);
   const [topHoje, setTopHoje] = useState<{ nome: string; qtd: number }[]>([]);
   const [horario, setHorario] = useState<{ hora: string; pedidos: number }[]>([]);
+  const [ticketMetodo, setTicketMetodo] = useState<{ metodo: string; ticket: number; total: number }[]>([]);
+  const [tempoMedio, setTempoMedio] = useState<number | null>(null);
+  const [taxaCancelamento, setTaxaCancelamento] = useState<{ taxa: number; cancelados: number; total: number } | null>(null);
 
   useEffect(() => {
     (async () => {
       const since = new Date(); since.setDate(since.getDate() - 30);
       const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
 
-      const { data } = await supabase.from("pedidos").select("*")
-        .neq("status", "cancelado")
-        .gte("criado_em", since.toISOString())
-        .order("criado_em");
-      const arr = (data ?? []).map((p: any) => ({ ...p, total: Number(p.total) })) as Pedido[];
+      // Busca todos (inclusive cancelados) para taxa de cancelamento
+      const { data: todos } = await supabase.from("pedidos").select("*")
+        .gte("criado_em", since.toISOString()).order("criado_em");
+      const todosArr = (todos ?? []).map((p: any) => ({ ...p, total: Number(p.total) })) as Pedido[];
+
+      const cancelados = todosArr.filter((p) => p.status === "cancelado").length;
+      const totalPedidos = todosArr.length;
+      setTaxaCancelamento({ taxa: totalPedidos ? (cancelados / totalPedidos) * 100 : 0, cancelados, total: totalPedidos });
+
+      const arr = todosArr.filter((p) => p.status !== "cancelado");
       setPedidos(arr);
+
+      // Ticket médio por método de pagamento
+      const metodos: Record<string, { soma: number; count: number }> = {};
+      arr.forEach((p) => {
+        if (!metodos[p.metodo_pagamento]) metodos[p.metodo_pagamento] = { soma: 0, count: 0 };
+        metodos[p.metodo_pagamento].soma += p.total;
+        metodos[p.metodo_pagamento].count += 1;
+      });
+      setTicketMetodo(
+        Object.entries(metodos)
+          .map(([metodo, { soma, count }]) => ({ metodo, ticket: count ? soma / count : 0, total: count }))
+          .sort((a, b) => b.ticket - a.ticket),
+      );
+
+      // Tempo médio de preparo (entregues com finalizado_em)
+      const entregues = arr.filter((p) => p.status === "entregue" && p.finalizado_em);
+      if (entregues.length) {
+        const mediaMs = entregues.reduce((s, p) => s + (new Date(p.finalizado_em!).getTime() - new Date(p.criado_em).getTime()), 0) / entregues.length;
+        setTempoMedio(Math.round(mediaMs / 60000)); // em minutos
+      }
 
       const ids = arr.map((p) => p.id);
       if (ids.length) {
@@ -176,6 +204,57 @@ function Dashboard() {
               <Line type="monotone" dataKey="total" stroke="oklch(0.85 0.17 90)" strokeWidth={3} dot={false} />
             </LineChart>
           </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* ── Novas métricas ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Ticket médio por método */}
+        <div className="rounded-2xl border bg-card p-4 col-span-1 sm:col-span-2">
+          <h3 className="font-display text-base font-semibold mb-3 flex items-center gap-2">
+            <DollarSign className="h-4 w-4 text-gold" /> Ticket médio por pagamento (30d)
+          </h3>
+          {ticketMetodo.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sem dados.</p>
+          ) : (
+            <div className="space-y-2">
+              {ticketMetodo.map((m) => {
+                const label: Record<string, string> = { dinheiro: "💵 Dinheiro", pix: "⚡ PIX", cartao: "💳 Cartão" };
+                const max = ticketMetodo[0].ticket;
+                return (
+                  <div key={m.metodo}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="font-medium">{label[m.metodo] ?? m.metodo}</span>
+                      <span className="text-gold font-bold">{brl(m.ticket)} <span className="text-muted-foreground font-normal text-xs">({m.total} ped.)</span></span>
+                    </div>
+                    <div className="h-2 rounded-full bg-secondary overflow-hidden">
+                      <div className="h-full bg-brand-gradient transition-all" style={{ width: `${max ? (m.ticket / max) * 100 : 0}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Tempo preparo + Taxa cancelamento */}
+        <div className="space-y-3">
+          <div className="rounded-2xl border bg-card p-4">
+            <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1"><Clock className="h-4 w-4" /> Tempo médio de preparo</div>
+            <div className="font-display text-3xl font-bold text-gold">
+              {tempoMedio !== null ? `${tempoMedio} min` : "—"}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">pedidos entregues (30d)</div>
+          </div>
+          <div className={`rounded-2xl border bg-card p-4 ${taxaCancelamento && taxaCancelamento.taxa > 5 ? "border-destructive/40" : ""}`}>
+            <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1"><Package className="h-4 w-4" /> Taxa de cancelamento</div>
+            <div className={`font-display text-3xl font-bold ${taxaCancelamento && taxaCancelamento.taxa > 5 ? "text-destructive" : "text-gold"}`}>
+              {taxaCancelamento ? `${taxaCancelamento.taxa.toFixed(1)}%` : "—"}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              {taxaCancelamento ? `${taxaCancelamento.cancelados} de ${taxaCancelamento.total} pedidos (30d)` : ""}
+            </div>
+          </div>
         </div>
       </div>
 

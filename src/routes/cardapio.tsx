@@ -89,30 +89,43 @@ export default function CardapioPublico() {
   return (
     <div className="min-h-screen bg-background">
       {/* ── Hero ── */}
-      <section className="relative overflow-hidden bg-brand-gradient py-14 px-4 text-center">
-        {/* Decoração de fundo */}
-        <div className="absolute inset-0 opacity-10 pointer-events-none select-none">
-          {["🌀","🌀","🌀","🌀","🌀","🌀"].map((e, i) => (
-            <span key={i} className="absolute text-6xl" style={{ top: `${[10,60,30,80,15,70][i]}%`, left: `${[5,15,40,55,75,90][i]}%`, transform: "rotate(-20deg)" }}>{e}</span>
-          ))}
+      <section className="relative overflow-hidden bg-brand-gradient py-16 px-4 text-center">
+        {/* Ondas decorativas */}
+        <div className="absolute inset-0 pointer-events-none select-none overflow-hidden">
+          <div className="absolute -top-16 -left-16 h-64 w-64 rounded-full bg-white/5" />
+          <div className="absolute -bottom-20 -right-10 h-72 w-72 rounded-full bg-black/10" />
+          <div className="absolute top-8 right-8 h-32 w-32 rounded-full bg-gold/10" />
         </div>
 
-        <div className="relative z-10">
-          <div className="inline-flex items-center justify-center h-20 w-20 rounded-full bg-white/15 mb-4 shadow-warm">
-            <Flame className="h-10 w-10 text-white" />
+        <div className="relative z-10 animate-fade-up">
+          {/* Logo tipográfico — sem arquivo externo */}
+          <div className="animate-hero-float inline-block mb-5">
+            <div className="inline-flex flex-col items-center justify-center h-24 w-24 rounded-2xl bg-white/15 backdrop-blur shadow-warm border border-white/20">
+              <Flame className="h-9 w-9 text-gold" />
+              <span className="text-[10px] font-black text-white/90 tracking-widest uppercase mt-1">Churros</span>
+            </div>
           </div>
-          <h1 className="font-display text-5xl font-black text-white drop-shadow-lg">Churros Crocantes</h1>
-          <p className="text-white/85 text-xl mt-2 font-medium">Artesanais • Fresquinhos • Irresistíveis</p>
 
-          <div className="mt-6 flex flex-wrap justify-center gap-4 text-white/80 text-sm">
-            <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-gold" /> Barraca de rua</span>
-            <span className="flex items-center gap-1.5"><Clock className="h-4 w-4 text-gold" /> Feitos na hora</span>
-            <span className="flex items-center gap-1.5"><Star className="h-4 w-4 text-gold fill-gold" /> Receita artesanal</span>
+          <h1 className="font-display text-5xl sm:text-6xl font-black text-white drop-shadow-lg leading-tight">
+            Churros<br/><span className="text-gold">Crocantes</span>
+          </h1>
+          <p className="text-white/80 text-lg mt-3 font-medium">Artesanais • Fresquinhos • Irresistíveis</p>
+
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
+            {[
+              { icon: <MapPin className="h-3.5 w-3.5" />, text: "Barraca de rua" },
+              { icon: <Clock className="h-3.5 w-3.5" />, text: "Feitos na hora" },
+              { icon: <Star className="h-3.5 w-3.5 fill-gold" />, text: "Receita artesanal" },
+            ].map((b) => (
+              <span key={b.text} className="flex items-center gap-1.5 bg-white/10 backdrop-blur px-3 py-1.5 rounded-full text-white/90 text-xs font-semibold">
+                <span className="text-gold">{b.icon}</span>{b.text}
+              </span>
+            ))}
           </div>
 
           <Button
             onClick={() => document.getElementById("cardapio-section")?.scrollIntoView({ behavior: "smooth" })}
-            className="mt-8 h-12 px-8 text-base font-bold bg-gold text-black hover:bg-gold/90 shadow-warm"
+            className="mt-8 h-12 px-10 text-base font-bold bg-gold text-black hover:bg-gold/90 shadow-gold rounded-full"
           >
             Ver cardápio ↓
           </Button>
@@ -156,15 +169,26 @@ export default function CardapioPublico() {
         </div>
 
         {loading ? (
-          <div className="text-center py-20 text-muted-foreground">Carregando cardápio…</div>
+          <div className="grid sm:grid-cols-2 gap-5">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-2xl border-2 border-border bg-card overflow-hidden animate-pulse">
+                <div className="aspect-4/3 bg-secondary/60" />
+                <div className="p-4 space-y-2">
+                  <div className="h-5 bg-secondary/60 rounded w-3/4" />
+                  <div className="h-3 bg-secondary/40 rounded w-full" />
+                  <div className="h-7 bg-secondary/40 rounded w-1/3 mt-3" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="grid sm:grid-cols-2 gap-5">
-            {filteredProdutos.map((p) => {
+            {filteredProdutos.map((p, idx) => {
               const prodFotos = fotos.filter((f) => f.produto_id === p.id).sort((a, b) => a.ordem - b.ordem);
               const qty = cart.find((e) => e.produto.id === p.id)?.quantidade ?? 0;
               return (
                 <ProdutoCard
-                  key={p.id} produto={p} fotos={prodFotos} qty={qty}
+                  key={p.id} produto={p} fotos={prodFotos} qty={qty} idx={idx}
                   onAdd={() => addToCart(p)} onRemove={() => removeOne(p.id)}
                 />
               );
@@ -175,18 +199,19 @@ export default function CardapioPublico() {
 
       {/* ── CTA WhatsApp fixo no fundo ── */}
       {cartCount > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 p-4 bg-background/95 backdrop-blur border-t border-border">
+        <div className="fixed bottom-0 left-0 right-0 z-40 p-4 bg-background/95 backdrop-blur border-t border-border animate-slide-in-top">
           <div className="max-w-3xl mx-auto flex gap-3">
             <button
               onClick={() => setCartOpen(true)}
               className="flex items-center gap-2 px-4 py-3 rounded-xl border-2 border-gold/30 bg-gold/10 text-gold font-semibold text-sm"
             >
               <ShoppingCart className="h-5 w-5" />
-              {cartCount} {cartCount === 1 ? "item" : "itens"} • {brl(cartTotal)}
+              <span className="animate-badge-bounce tabular-nums">{cartCount}</span>
+              <span>{cartCount === 1 ? "item" : "itens"} • {brl(cartTotal)}</span>
             </button>
             <Button
               onClick={pedirWhatsApp}
-              className="flex-1 h-12 text-base font-bold bg-[#25D366] hover:bg-[#1ebe5c] text-white gap-2"
+              className="flex-1 h-12 text-base font-bold bg-[#25D366] hover:bg-[#1ebe5c] text-white gap-2 animate-pulse-soft rounded-xl"
             >
               <MessageCircle className="h-5 w-5" />
               Pedir via WhatsApp
@@ -275,37 +300,40 @@ function FilterBtn({ active, onClick, children }: { active: boolean; onClick: ()
   );
 }
 
-function ProdutoCard({ produto: p, fotos, qty, onAdd, onRemove }: {
-  produto: Produto; fotos: Foto[]; qty: number; onAdd: () => void; onRemove: () => void;
+const STAGGER_DELAYS = ["delay-0","delay-1","delay-2","delay-3","delay-4","delay-5","delay-6","delay-7"] as const;
+
+function ProdutoCard({ produto: p, fotos, qty, idx: cardIdx, onAdd, onRemove }: {
+  produto: Produto; fotos: Foto[]; qty: number; idx: number; onAdd: () => void; onRemove: () => void;
 }) {
-  const [idx, setIdx] = useState(0);
-  const prev = () => setIdx((i) => (i - 1 + fotos.length) % fotos.length);
-  const next = () => setIdx((i) => (i + 1) % fotos.length);
+  const [slideIdx, setSlideIdx] = useState(0);
+  const prev = () => setSlideIdx((i) => (i - 1 + fotos.length) % fotos.length);
+  const next = () => setSlideIdx((i) => (i + 1) % fotos.length);
+  const delay = STAGGER_DELAYS[cardIdx % STAGGER_DELAYS.length];
 
   return (
-    <div className={`rounded-2xl border-2 bg-card overflow-hidden transition ${p.esgotado ? "opacity-50 border-border" : "border-border hover:border-primary/40"}`}>
-      {/* Foto / carrossel */}
+    <div className={`rounded-2xl border-2 bg-card overflow-hidden transition animate-fade-up ${delay} ${p.esgotado ? "opacity-50 border-border" : "border-border hover:border-primary/40 hover:shadow-warm"}`}>
+      {/* Foto / carrossel — aspect-ratio 4:3 fixo, object-top para não cortar o produto */}
       {fotos.length > 0 ? (
-        <div className="relative w-full h-52 bg-black select-none">
-          {fotos[idx].tipo === "video" ? (
-        <video src={fotos[idx].url} className="w-full h-full object-cover" controls playsInline preload="metadata" />
-      ) : (
-        <img src={fotos[idx].url} alt={`${p.nome} ${idx + 1}`} className="w-full h-full object-cover" />
-      )}
+        <div className="relative w-full aspect-4/3 bg-black select-none overflow-hidden">
+          {fotos[slideIdx].tipo === "video" ? (
+            <video src={fotos[slideIdx].url} className="w-full h-full object-cover object-top" controls playsInline preload="metadata" />
+          ) : (
+            <img src={fotos[slideIdx].url} alt={`${p.nome} ${slideIdx + 1}`} className="w-full h-full object-cover object-top" />
+          )}
           {fotos.length > 1 && (
             <>
-              <button onClick={prev} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 transition"><ChevronLeft className="h-5 w-5" /></button>
-              <button onClick={next} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 transition"><ChevronRight className="h-5 w-5" /></button>
+              <button onClick={prev} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition"><ChevronLeft className="h-4 w-4" /></button>
+              <button onClick={next} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition"><ChevronRight className="h-4 w-4" /></button>
               <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
                 {fotos.map((_, i) => (
-                  <button key={i} onClick={() => setIdx(i)} className={`h-1.5 rounded-full transition-all ${i === idx ? "w-4 bg-white" : "w-1.5 bg-white/50"}`} />
+                  <button key={i} onClick={() => setSlideIdx(i)} className={`h-1.5 rounded-full transition-all ${i === slideIdx ? "w-5 bg-white" : "w-1.5 bg-white/50"}`} />
                 ))}
               </div>
             </>
           )}
         </div>
       ) : (
-        <div className="w-full h-32 bg-linear-to-br from-primary/20 to-gold/10 flex items-center justify-center">
+        <div className="w-full aspect-4/3 bg-linear-to-br from-primary/20 to-gold/10 flex items-center justify-center">
           <Flame className="h-12 w-12 text-primary/30" />
         </div>
       )}
@@ -315,7 +343,7 @@ function ProdutoCard({ produto: p, fotos, qty, onAdd, onRemove }: {
           <h3 className="font-display text-lg font-bold leading-tight">{p.nome}</h3>
           {p.esgotado && <span className="shrink-0 text-xs font-bold bg-destructive/20 text-destructive px-2 py-0.5 rounded-full">Esgotado</span>}
         </div>
-        {p.descricao && <p className="text-sm text-muted-foreground mb-3">{p.descricao}</p>}
+        {p.descricao && <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{p.descricao}</p>}
 
         <div className="flex items-center justify-between mt-3">
           <span className="text-gold font-bold text-2xl">{brl(p.preco_base)}</span>
@@ -331,11 +359,11 @@ function ProdutoCard({ produto: p, fotos, qty, onAdd, onRemove }: {
             </button>
           ) : (
             <div className="flex items-center gap-2">
-              <button onClick={onRemove} className="h-9 w-9 rounded-xl border-2 border-border flex items-center justify-center hover:border-primary transition">
+              <button onClick={onRemove} className="h-9 w-9 rounded-xl border-2 border-border flex items-center justify-center hover:border-primary transition active:scale-90">
                 <Minus className="h-4 w-4" />
               </button>
-              <span className="font-bold text-lg w-6 text-center">{qty}</span>
-              <button onClick={onAdd} className="h-9 w-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition">
+              <span className="font-bold text-lg w-6 text-center tabular-nums">{qty}</span>
+              <button onClick={onAdd} className="h-9 w-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition active:scale-90">
                 <Plus className="h-4 w-4" />
               </button>
             </div>

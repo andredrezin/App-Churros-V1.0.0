@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ProductDialog } from "@/components/pos/ProductDialog";
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
 import { OrderConfirmation } from "@/components/pos/OrderConfirmation";
-import { Flame, LogOut, ShoppingCart, Trash2, X, ListOrdered } from "lucide-react";
+import { Flame, LogOut, ShoppingCart, Trash2, X, ListOrdered, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/caixa")({
@@ -28,11 +28,12 @@ function CaixaPage() {
   const [confirmNum, setConfirmNum] = useState<number | null>(null);
   const [recent, setRecent] = useState<Pedido[]>([]);
   const [filaCount, setFilaCount] = useState(0);
+  const [topHoje, setTopHoje] = useState<{ produto: Produto; qtd: number }[]>([]);
 
   useEffect(() => { if (categorias.length && !tab) setTab(categorias[0].id); }, [categorias, tab]);
 
   const loadRecent = async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
     const { data } = await supabase.from("pedidos").select("*")
       .eq("data_pedido", today).order("criado_em", { ascending: false }).limit(10);
     if (data) setRecent(data.map((p: any) => ({ ...p, total: Number(p.total) })) as any);
@@ -41,10 +42,34 @@ function CaixaPage() {
     setFilaCount(count ?? 0);
   };
 
+  const loadTopHoje = async () => {
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+    const { data: peds } = await supabase.from("pedidos").select("id")
+      .eq("data_pedido", today).neq("status", "cancelado");
+    const ids = (peds ?? []).map((p: any) => p.id);
+    if (!ids.length) return;
+    const { data: itens } = await supabase.from("itens_pedido")
+      .select("produto_id, quantidade").in("pedido_id", ids);
+    const counts: Record<string, number> = {};
+    (itens ?? []).forEach((i: any) => { counts[i.produto_id] = (counts[i.produto_id] ?? 0) + i.quantidade; });
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 4);
+    const threshold = 5;
+    const topIds = sorted.filter(([, qtd]) => qtd >= threshold).map(([id]) => id);
+    if (!topIds.length) return;
+    const { data: prods } = await supabase.from("produtos").select("*").in("id", topIds).eq("ativo", true);
+    setTopHoje(
+      topIds
+        .map((id) => ({ produto: (prods ?? []).find((p: any) => p.id === id), qtd: counts[id] }))
+        .filter((x) => x.produto)
+        .map((x) => ({ produto: { ...x.produto, preco_base: Number(x.produto.preco_base) } as Produto, qtd: x.qtd })),
+    );
+  };
+
   useEffect(() => {
     loadRecent();
+    loadTopHoje();
     const ch = supabase.channel("caixa-pedidos")
-      .on("postgres_changes", { event: "*", schema: "public", table: "pedidos" }, () => loadRecent())
+      .on("postgres_changes", { event: "*", schema: "public", table: "pedidos" }, () => { loadRecent(); loadTopHoje(); })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, []);
@@ -93,6 +118,28 @@ function CaixaPage() {
       <div className="grid lg:grid-cols-[1fr_380px] gap-4 p-4">
         {/* Cardápio */}
         <div>
+          {/* ── Mais pedidos hoje ── */}
+          {topHoje.length > 0 && (
+            <div className="mb-4 rounded-2xl border border-gold/20 bg-gold/5 p-3">
+              <h2 className="text-xs font-bold uppercase tracking-widest text-gold mb-2 flex items-center gap-1.5">
+                <TrendingUp className="h-3.5 w-3.5" /> Mais pedidos hoje
+              </h2>
+              <div className="flex gap-2 flex-wrap">
+                {topHoje.map(({ produto: p, qtd }) => (
+                  <button
+                    key={p.id}
+                    disabled={p.esgotado}
+                    onClick={() => !p.esgotado && setSelProduto(p)}
+                    className="flex items-center gap-2 rounded-xl border border-gold/30 bg-card px-3 py-2 text-sm hover:border-gold transition active:scale-95 disabled:opacity-40"
+                  >
+                    <span className="font-semibold">{p.nome}</span>
+                    <span className="text-gold font-bold text-xs">{qtd}×</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {loading ? (
             <p className="text-muted-foreground">Carregando cardápio…</p>
           ) : (
