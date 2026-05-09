@@ -18,7 +18,7 @@ export const Route = createFileRoute("/cardapio")({
   component: CardapioPublico,
 });
 
-type Foto = { id: string; produto_id: string; url: string; ordem: number };
+type Foto = { id: string; produto_id: string; url: string; ordem: number; tipo?: "foto" | "video" };
 type CartEntry = { produto: Produto; quantidade: number };
 
 export default function CardapioPublico() {
@@ -287,7 +287,11 @@ function ProdutoCard({ produto: p, fotos, qty, onAdd, onRemove }: {
       {/* Foto / carrossel */}
       {fotos.length > 0 ? (
         <div className="relative w-full h-52 bg-black select-none">
-          <img src={fotos[idx].url} alt={`${p.nome} ${idx + 1}`} className="w-full h-full object-cover" />
+          {fotos[idx].tipo === "video" ? (
+        <video src={fotos[idx].url} className="w-full h-full object-cover" controls playsInline preload="metadata" />
+      ) : (
+        <img src={fotos[idx].url} alt={`${p.nome} ${idx + 1}`} className="w-full h-full object-cover" />
+      )}
           {fotos.length > 1 && (
             <>
               <button onClick={prev} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 transition"><ChevronLeft className="h-5 w-5" /></button>

@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import {
   LogOut, Crown, Download, TrendingUp, Package, Clock, DollarSign,
-  Upload, QrCode, Share2, ExternalLink, ImageOff, Plus, Pencil, Trash2,
+  Upload, QrCode, Share2, ExternalLink, ImageOff, Plus, Pencil, Trash2, Video,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -215,7 +215,7 @@ function Dashboard() {
   );
 }
 
-type ProdutoFoto = { id: string; produto_id: string; url: string; ordem: number };
+type ProdutoFoto = { id: string; produto_id: string; url: string; ordem: number; tipo: "foto" | "video" };
 
 type ProdutoForm = {
   nome: string; descricao: string; categoria_id: string; preco_base: string; ativo: boolean;
@@ -228,6 +228,7 @@ function Cardapio() {
   const [fotos, setFotos] = useState<ProdutoFoto[]>([]);
   const [uploading, setUploading] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const uploadingProdId = useRef<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editando, setEditando] = useState<Produto | null>(null);
@@ -298,6 +299,28 @@ function Cardapio() {
     fileInputRef.current?.click();
   };
 
+  const handleVideoClick = (prodId: string) => {
+    uploadingProdId.current = prodId;
+    videoInputRef.current?.click();
+  };
+
+  const getVideoDuration = (file: File): Promise<number> =>
+    new Promise((resolve) => {
+      const el = document.createElement("video");
+      el.preload = "metadata";
+      el.onloadedmetadata = () => { URL.revokeObjectURL(el.src); resolve(el.duration); };
+      el.src = URL.createObjectURL(file);
+    });
+
+  const uploadMidia = async (file: File, prodId: string, ordem: number, tipo: "foto" | "video") => {
+    const ext = file.name.split(".").pop();
+    const path = `${prodId}/${crypto.randomUUID()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from("produto-fotos").upload(path, file);
+    if (upErr) { toast.error("Erro no upload: " + upErr.message); return; }
+    const { data: urlData } = supabase.storage.from("produto-fotos").getPublicUrl(path);
+    await supabase.from("produto_fotos").insert({ produto_id: prodId, url: urlData.publicUrl, ordem, tipo });
+  };
+
   const handleFotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     const prodId = uploadingProdId.current;
@@ -305,18 +328,31 @@ function Cardapio() {
     e.target.value = "";
     setUploading(prodId);
     const existingOrdem = fotos.filter((f) => f.produto_id === prodId).length;
-    await Promise.all(files.map(async (file, idx) => {
-      const ext = file.name.split(".").pop();
-      const path = `${prodId}/${crypto.randomUUID()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("produto-fotos").upload(path, file);
-      if (upErr) { toast.error("Erro no upload: " + upErr.message); return; }
-      const { data: urlData } = supabase.storage.from("produto-fotos").getPublicUrl(path);
-      await supabase.from("produto_fotos").insert({ produto_id: prodId, url: urlData.publicUrl, ordem: existingOrdem + idx });
-    }));
-    const primeiraFoto = fotos.find((f) => f.produto_id === prodId)?.url
-      ?? (await supabase.from("produto_fotos").select("url").eq("produto_id", prodId).order("ordem").limit(1).single()).data?.url;
+    await Promise.all(files.map((file, idx) => uploadMidia(file, prodId, existingOrdem + idx, "foto")));
+    const primeiraFoto = fotos.find((f) => f.produto_id === prodId && f.tipo === "foto")?.url
+      ?? (await supabase.from("produto_fotos").select("url").eq("produto_id", prodId).eq("tipo", "foto").order("ordem").limit(1).single()).data?.url;
     if (primeiraFoto) await supabase.from("produtos").update({ foto_url: primeiraFoto }).eq("id", prodId);
     toast.success(`${files.length} foto(s) adicionada(s)!`);
+    setUploading(null);
+    reload();
+  };
+
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const prodId = uploadingProdId.current;
+    if (!file || !prodId) return;
+    e.target.value = "";
+
+    const duration = await getVideoDuration(file);
+    if (duration > 62) {
+      toast.error(`Vídeo muito longo (${Math.round(duration)}s). Máximo: 1 minuto.`);
+      return;
+    }
+
+    setUploading(prodId);
+    const existingOrdem = fotos.filter((f) => f.produto_id === prodId).length;
+    await uploadMidia(file, prodId, existingOrdem, "video");
+    toast.success("Vídeo adicionado!");
     setUploading(null);
     reload();
   };
@@ -326,14 +362,16 @@ function Cardapio() {
     const path = foto.url.split("/produto-fotos/")[1];
     if (path) await supabase.storage.from("produto-fotos").remove([path]);
     const restantes = fotos.filter((f) => f.produto_id === foto.produto_id && f.id !== foto.id);
-    await supabase.from("produtos").update({ foto_url: restantes[0]?.url ?? null }).eq("id", foto.produto_id);
-    toast.success("Foto removida");
+    const novaFotoCapa = restantes.find((f) => f.tipo === "foto")?.url ?? null;
+    await supabase.from("produtos").update({ foto_url: novaFotoCapa }).eq("id", foto.produto_id);
+    toast.success(`${foto.tipo === "video" ? "Vídeo" : "Foto"} removido`);
     reload();
   };
 
   return (
     <div className="space-y-4">
       <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFotoUpload} />
+      <input ref={videoInputRef} type="file" accept="video/mp4,video/quicktime,video/webm" className="hidden" onChange={handleVideoUpload} />
 
       <div className="flex justify-end">
         <Button onClick={abrirNovo} className="bg-brand-gradient gap-2">
@@ -369,18 +407,36 @@ function Cardapio() {
                     <div className="flex items-center gap-2 overflow-x-auto pb-1">
                       {prodFotos.map((foto, idx) => (
                         <div key={foto.id} className="relative shrink-0 group">
-                          <img src={foto.url} alt={`${p.nome} ${idx + 1}`} className="h-20 w-20 rounded-lg object-cover" />
-                          {idx === 0 && <span className="absolute top-1 left-1 text-[10px] font-bold bg-gold text-black px-1 rounded">capa</span>}
+                          {foto.tipo === "video" ? (
+                            <video src={foto.url} className="h-20 w-20 rounded-lg object-cover bg-black" muted playsInline
+                              onMouseEnter={(e) => (e.currentTarget as HTMLVideoElement).play()}
+                              onMouseLeave={(e) => { (e.currentTarget as HTMLVideoElement).pause(); (e.currentTarget as HTMLVideoElement).currentTime = 0; }}
+                            />
+                          ) : (
+                            <img src={foto.url} alt={`${p.nome} ${idx + 1}`} className="h-20 w-20 rounded-lg object-cover" />
+                          )}
+                          {foto.tipo === "video"
+                            ? <span className="absolute top-1 left-1 text-[10px] font-bold bg-blue-500 text-white px-1 rounded flex items-center gap-0.5"><Video className="h-2.5 w-2.5" />vídeo</span>
+                            : idx === 0 && <span className="absolute top-1 left-1 text-[10px] font-bold bg-gold text-black px-1 rounded">capa</span>
+                          }
                           <button onClick={() => removerFoto(foto)} className="absolute inset-0 bg-black/60 rounded-lg opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
                             <ImageOff className="h-4 w-4 text-white" />
                           </button>
                         </div>
                       ))}
-                      <button onClick={() => handleFotoClick(p.id)} disabled={uploading === p.id}
+                      {/* Botão adicionar foto */}
+                      <button onClick={() => handleFotoClick(p.id)} disabled={!!uploading}
                         className="h-20 w-20 shrink-0 rounded-lg border-2 border-dashed border-border hover:border-primary flex flex-col items-center justify-center gap-1 transition">
                         {uploading === p.id
                           ? <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                           : <><Upload className="h-5 w-5 text-muted-foreground" /><span className="text-[10px] text-muted-foreground">Foto</span></>}
+                      </button>
+                      {/* Botão adicionar vídeo (máx 1 min) */}
+                      <button onClick={() => handleVideoClick(p.id)} disabled={!!uploading}
+                        className="h-20 w-20 shrink-0 rounded-lg border-2 border-dashed border-blue-500/40 hover:border-blue-500 flex flex-col items-center justify-center gap-1 transition">
+                        <Video className="h-5 w-5 text-blue-400" />
+                        <span className="text-[10px] text-blue-400">Vídeo</span>
+                        <span className="text-[9px] text-muted-foreground">máx 1min</span>
                       </button>
                     </div>
                   </div>
